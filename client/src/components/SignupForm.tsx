@@ -1,19 +1,17 @@
 import { useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import { ChangeEvent, FormEvent } from 'react';
 import { Form, Button, Alert } from 'react-bootstrap';
+import { useMutation } from '@apollo/client';
+import { ADD_USER } from '../utils/mutations.js';
+import Auth from '../utils/auth.js';
+import type { User } from '../models/User.js';
 
-import { createUser } from '../utils/API';
-import Auth from '../utils/auth';
-import type { User } from '../models/User';
-
-// biome-ignore lint/correctness/noEmptyPattern: <explanation>
-const SignupForm = ({}: { handleModalClose: () => void }) => {
-  // set initial form state
+const SignupForm = ({ handleModalClose }: { handleModalClose: () => void }) => {
   const [userFormData, setUserFormData] = useState<User>({ username: '', email: '', password: '', savedBooks: [] });
-  // set state for form validation
   const [validated] = useState(false);
-  // set state for alert
   const [showAlert, setShowAlert] = useState(false);
+
+  const [createUser] = useMutation(ADD_USER);
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -23,7 +21,6 @@ const SignupForm = ({}: { handleModalClose: () => void }) => {
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    // check if form has everything (as per react-bootstrap docs)
     const form = event.currentTarget;
     if (form.checkValidity() === false) {
       event.preventDefault();
@@ -31,32 +28,37 @@ const SignupForm = ({}: { handleModalClose: () => void }) => {
     }
 
     try {
-      const response = await createUser(userFormData);
+      const { data } = await createUser({
+        variables: { 
+          username: userFormData.username,
+          email: userFormData.email,
+          password: userFormData.password
+        },
+      });
 
-      if (!response.ok) {
-        throw new Error('something went wrong!');
+      if (!data) {
+        throw new Error('Something went wrong during signup!');
       }
 
-      const { token } = await response.json();
-      Auth.login(token);
+      const { token } = data.createUser;  
+      Auth.login(token); 
+      handleModalClose(); 
+      
+      setUserFormData({
+        username: '',
+        email: '',
+        password: '',
+        savedBooks: [],
+      });
     } catch (err) {
       console.error(err);
       setShowAlert(true);
     }
-
-    setUserFormData({
-      username: '',
-      email: '',
-      password: '',
-      savedBooks: [],
-    });
   };
 
   return (
     <>
-      {/* This is needed for the validation functionality above */}
       <Form noValidate validated={validated} onSubmit={handleFormSubmit}>
-        {/* show alert if server response is bad */}
         <Alert dismissible onClose={() => setShowAlert(false)} show={showAlert} variant='danger'>
           Something went wrong with your signup!
         </Alert>
